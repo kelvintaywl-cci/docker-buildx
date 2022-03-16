@@ -1,0 +1,59 @@
+version: 2.1
+
+jobs:
+  buildx:
+    parameters:
+      docker-version:
+        type: string
+        default: '20.10.11'
+        description: https://circleci.com/docs/2.0/building-docker-images/#docker-version
+      enable-experimental-feature:
+        type: boolean
+        default: false
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+    steps:
+      - setup_remote_docker:
+          version: << parameters.docker-version >>
+      - checkout
+      - when:
+          condition: << parameters.enable-experimental-feature >>
+          steps:
+            - run:
+                name: Enable Experimental feature on Docker Daemon
+                command: |
+                  ssh remote-docker \<<EOF
+                    sudo bash -c 'echo "{\"features\": {\"experimental\": true } }" > /etc/docker/daemon.json'
+                    sudo systemctl restart docker
+                    sudo docker info
+                  EOF
+      - run:
+          name: Build image (with BuildKit)
+          command: |
+            docker buildx build --tag hello .
+      - run:
+          name: Test run image
+          command: |
+            docker run --rm hello
+
+workflows:
+  main:
+    jobs:
+      - buildx:
+          matrix:
+            parameters:
+              docker-version:
+                - '20.10.11'
+                - '19.03.13'
+                - '17.09.0-ce'  # note: will not work with BuildKit
+              enable-experimental-feature:
+                - false
+                - true
+            exclude:
+              # not required
+              - docker-version: '20.10.11'
+                enable-experimental-feature: true
+              # will definitely fail anyways
+              - docker-version: '17.09.0-ce'
+                enable-experimental-feature: false

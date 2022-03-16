@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# hello in Ukrainian
+echo "Здравствуйте"
