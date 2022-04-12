@@ -44,9 +44,10 @@ workflows:
           matrix:
             parameters:
               docker-version:
+                - '20.10.12'
                 - '20.10.11'
                 - '19.03.13'
-                - '17.09.0-ce'  # note: will not work with BuildKit
+                # - '17.09.0-ce'  # note: will not work with BuildKit
               enable-experimental-feature:
                 - false
                 - true
