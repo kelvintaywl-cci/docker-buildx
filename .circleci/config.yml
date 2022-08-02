@@ -52,9 +52,8 @@ workflows:
                 - false
                 - true
             exclude:
-              # not required
+              # not required to use experimental features
               - docker-version: '20.10.11'
                 enable-experimental-feature: true
-              # will definitely fail anyways
-              - docker-version: '17.09.0-ce'
-                enable-experimental-feature: false
+              - docker-version: '20.10.12'
+                enable-experimental-feature: true
