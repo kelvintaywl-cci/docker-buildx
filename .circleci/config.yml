@@ -16,6 +16,7 @@ jobs:
     steps:
       - setup_remote_docker:
           version: << parameters.docker-version >>
+          # NOTE: investigating if DLC works when using buildx
           docker_layer_caching: true
       - checkout
       - when:
