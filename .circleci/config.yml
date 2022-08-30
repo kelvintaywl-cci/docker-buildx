@@ -31,15 +31,13 @@ jobs:
                     sudo docker info
                   EOF
       - run:
-          name: Creater Docker builder instance
+          name: Build image (with BuildKit)
           command: |
             docker buildx ls
 
             docker context create builder
             docker --context builder buildx create --use
-      - run:
-          name: Build image (with BuildKit)
-          command: |
+
             # DEBUG: confirm we are using mybuilder instance
             docker buildx inspect
 
