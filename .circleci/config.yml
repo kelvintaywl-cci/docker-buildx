@@ -35,7 +35,9 @@ jobs:
           command: |
             docker buildx ls
 
-            docker buildx create --name mybuilder --use
+            docker context create builder
+            docker context use builder
+            docker buildx create --name builder --use
       - run:
           name: Build image (with BuildKit)
           command: |
