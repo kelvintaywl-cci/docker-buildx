@@ -31,9 +31,22 @@ jobs:
                     sudo docker info
                   EOF
       - run:
+          name: Creater Docker builder instance
+          command: |
+            docker buildx ls
+
+            docker buildx create --name mybuilder --use
+      - run:
           name: Build image (with BuildKit)
           command: |
+            # DEBUG: confirm we are using mybuilder instance
+            docker buildx inspect
+
             docker buildx build --tag hello .
+            docker buildx build --cache-from=type=local,src=/tmp/buildx-cache \
+                --cache-to=type=local,dest=/tmp/buildx-cache \
+                --load --tag=hello \
+                .
       - run:
           name: Test run image
           command: |
