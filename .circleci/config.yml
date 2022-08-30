@@ -36,16 +36,14 @@ jobs:
             docker buildx ls
 
             docker context create builder
-            docker context use builder
-            docker buildx create --name builder --use
+            docker --context builder buildx create --use
       - run:
           name: Build image (with BuildKit)
           command: |
             # DEBUG: confirm we are using mybuilder instance
             docker buildx inspect
 
-            docker buildx build --tag hello .
-            docker buildx build --cache-from=type=local,src=/tmp/buildx-cache \
+            docker --context builder buildx build --cache-from=type=local,src=/tmp/buildx-cache \
                 --cache-to=type=local,dest=/tmp/buildx-cache \
                 --load --tag=hello \
                 .
