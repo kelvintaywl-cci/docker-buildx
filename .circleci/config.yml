@@ -41,9 +41,8 @@ jobs:
             # DEBUG: confirm we are using mybuilder instance
             docker buildx inspect
 
-            docker --context builder buildx build --cache-from=type=local,src=/tmp/buildx-cache \
-                --cache-to=type=local,dest=/tmp/buildx-cache \
-                --load --tag=hello \
+            docker --context builder buildx build \
+                --tag=hello \
                 .
       - run:
           name: Test run image
