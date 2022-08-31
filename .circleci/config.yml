@@ -196,4 +196,3 @@ workflows:
               exc:
                 - docker
                 - machine
-          context: docker
