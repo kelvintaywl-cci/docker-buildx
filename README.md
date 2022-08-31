@@ -8,6 +8,16 @@ In addition, this project shows how we can take advantage of cache options with 
 
 > By leveraging the cache options, [CircleCI's Docker Layer Caching (DLC) feature](https://circleci.com/docs/docker-layer-caching) is no longer necessary.
 
+In our `i-can-buildx` workflow, we have 4 distinct jobs, where:
+
+| job name | executor | buildx cache type | pushed image |
+| --- | --- | --- | --- |
+| build-push-registry-machine | Machine | [Registry on Docker Hub](https://hub.docker.com/r/kelvintaywlcircleci/hello-buildx-registry-cache) | `docker.io/kelvintaywlcircleci/hello-buildx:registry-machine` |
+| build-push-registry-docker | Docker + Remote Docker | [Registry on Docker Hub](https://hub.docker.com/r/kelvintaywlcircleci/hello-buildx-registry-cache) | `docker.io/kelvintaywlcircleci/hello-buildx:local-machine` |
+| build-push-local-machine | Machine | local (CircleCI cache) | `docker.io/kelvintaywlcircleci/hello-buildx:registry-docker` |
+| build-push-local-docker | Docker + Remote Docker | local (CircleCI cache) | `docker.io/kelvintaywlcircleci/hello-buildx:local-docker` |
+
+
 ## Helpful References
 
 - https://docs.docker.com/engine/reference/commandline/buildx_build/
