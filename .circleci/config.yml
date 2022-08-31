@@ -1,71 +1,199 @@
 version: 2.1
 
-jobs:
-  buildx:
-    parameters:
-      docker-version:
-        type: string
-        default: '20.10.11'
-        description: https://circleci.com/docs/2.0/building-docker-images/#docker-version
-      enable-experimental-feature:
-        type: boolean
-        default: false
+defaults:
+  environment: &environment
+    DOCKER_REGISTRY: docker.io
+    DOCKER_USER: kelvintaywlcircleci
+    DOCKER_LOGIN: kelvintaywlcircleci
+    # DOCKER_PASSWORD will be injected as a secret
+
+commands:
+  docker-registry-login:
+    description: log in to the Docker image registry
+    steps:
+      - run:
+          name: Login to registry
+          command: |
+            # login credentials should be provided via context or project environment variables.
+            echo $DOCKER_PASSWORD | docker login $DOCKER_REGISTRY --username $DOCKER_LOGIN --password-stdin
+  setup-buildx:
+    description: set up context and builder instances for Docker buildx
+    steps:
+      - run:
+          name: Check Docker settings (for buildx)
+          command: |
+            docker version
+            docker buildx version
+            docker context inspect
+      - run:
+          name: Setup docker buildx
+          command: |
+            docker context create circleci
+            docker buildx create --use circleci
+
+            docker buildx ls
+            docker context inspect circleci
+
+executors:
+  docker:
     docker:
       - image: cimg/base:stable
-    resource_class: small
+  machine:
+    machine:
+      # See https://circleci.com/developer/images?imageType=machine
+      image: ubuntu-2204:2022.08.1 
+
+jobs:
+  build-push:
+    environment:
+      <<: *environment
+    parameters:
+      exc:
+        type: enum
+        enum:
+          - docker
+          - machine
+    executor: << parameters.exc >>
     steps:
-      - setup_remote_docker:
-          version: << parameters.docker-version >>
-          # NOTE: investigating if DLC works when using buildx
-          docker_layer_caching: true
       - checkout
-      - when:
-          condition: << parameters.enable-experimental-feature >>
-          steps:
-            - run:
-                name: Enable Experimental feature on Docker Daemon
-                command: |
-                  ssh remote-docker \<<EOF
-                    sudo bash -c 'echo "{\"features\": {\"experimental\": true } }" > /etc/docker/daemon.json'
-                    sudo systemctl restart docker
-                    sudo docker info
-                  EOF
-      - run:
-          name: Build image (with BuildKit)
-          command: |
-            docker buildx ls
+    
 
-            docker context create builder
-            docker --context builder buildx create --use
 
-            # DEBUG: confirm we are using mybuilder instance
-            docker buildx inspect
+  # build_custom_nginx:
+  #   environment:
+  #     <<: *environment
+  #   docker:
+  #     - image: cimg/base:stable
+  #   parameters:
+  #     image_name:
+  #       type: string
+  #       default: 'fancy-nginx'
+  #     image_tag:
+  #       type: string
+  #       default: 'latest'
+  #   steps:
+  #     - checkout
+  #     - setup_remote_docker:
+  #         # https://circleci.com/docs/2.0/building-docker-images/#docker-version
+  #         version: 20.10.12
+  #         # intentionally turn off CircleCI DLC
+  #         docker_layer_caching: false
+  #     - setup-buildx
+  #     - restore_cache:
+  #         keys:
+  #           - docker-{{ arch }}-{{ .Branch }}-
+  #           - docker-{{ arch }}-
+  #     - run:
+  #         name: Docker build with local cache
+  #         command: |
+  #           docker buildx build --progress=plain \
+  #             --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" \
+  #             --cache-to=type=local,mode=max,dest=/tmp/dockercache \
+  #             --cache-from=type=local,src=/tmp/dockercache \
+  #             --output=type=docker \
+  #             .
 
-            docker --context builder buildx build \
-                --tag=hello \
-                .
-      - run:
-          name: Test run image
-          command: |
-            docker run --rm hello
+  #           docker image ls
+  #     - save_cache:
+  #         key: docker-{{ arch }}-{{ .Branch }}-{{ checksum "/tmp/dockercache/index.json" }}
+  #         paths:
+  #           - /tmp/dockercache
+  #     - run:
+  #         name: Run built-image as container (background)
+  #         command: |
+  #           docker container run -d --name fancy-nginx -p "8080:80" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}"
+  #     - run:
+  #         name: Check container is up
+  #         command: |
+  #           # Because we are using remote_docker, all docker-related activities run inside this remote container.
+  #           # In other words, the nginx server is not directly accessible to our primary container here.
+  #           # Hence, we run dockerize in the same network in order to poll it.
+  #           # NOTE that we are polling port 80, not 8080 since inside the network, our fancy-nginx is exposed at port 80 instead.
+  #           # See https://circleci.com/docs/2.0/building-docker-images/#accessing-services
+  #           docker container run --network container:fancy-nginx docker.io/jwilder/dockerize -wait http://localhost:80 -wait-retry-interval 2s -timeout 20s
+  #     - run:
+  #         name: Printscreen webpage served by container
+  #         command: |
+  #           # https://hub.docker.com/r/lifenz/docker-screenshot
+  #           # Save a screenshot as screenshot.png at 1280px after pausing 2000ms, with zoom factor: 1
+  #           docker container run --network container:fancy-nginx --name screenshot lifenz/docker-screenshot http://localhost:80 screenshot.png 1280px 2000 1
+  #           docker cp screenshot:/srv/screenshot.png $PWD
+  #     - store_artifacts:
+  #          path: screenshot.png
+  #     - docker-registry-login
+  #     - run:
+  #         name: Publish image
+  #         command: |
+  #           docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:<< parameters.image_tag >>"
+  #           docker image push --all-tags "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>"
+
+  # build_custom_nginx_via_registry:
+  #   environment:
+  #     <<: *environment
+  #   docker:
+  #     - image: cimg/base:stable
+  #   parameters:
+  #     image_name:
+  #       type: string
+  #       default: 'fancy-nginx'
+  #     image_tag:
+  #       type: string
+  #       default: 'latest'
+  #   steps:
+  #     - checkout
+  #     - setup_remote_docker:
+  #         # https://circleci.com/docs/2.0/building-docker-images/#docker-version
+  #         version: 20.10.12
+  #         # intentionally turn off CircleCI DLC
+  #         docker_layer_caching: false
+  #     - setup-buildx
+  #     - docker-registry-login
+  #     - run:
+  #         name: Docker build with registry cache
+  #         command: |
+  #           docker buildx build --progress=plain \
+  #             --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" \
+  #             --cache-to=type=registry,mode=max,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:cache" \
+  #             --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:cache" \
+  #             --output=type=docker \
+  #             .
+
+  #           docker image ls
+  #     - run:
+  #         name: Run built-image as container (background)
+  #         command: |
+  #           docker container run -d --name fancy-nginx -p "8080:80" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}"
+  #     - run:
+  #         name: Check container is up
+  #         command: |
+  #           # Because we are using remote_docker, all docker-related activities run inside this remote container.
+  #           # In other words, the nginx server is not directly accessible to our primary container here.
+  #           # Hence, we run dockerize in the same network in order to poll it.
+  #           # NOTE that we are polling port 80, not 8080 since inside the network, our fancy-nginx is exposed at port 80 instead.
+  #           # See https://circleci.com/docs/2.0/building-docker-images/#accessing-services
+  #           docker container run --network container:fancy-nginx docker.io/jwilder/dockerize -wait http://localhost:80 -wait-retry-interval 2s -timeout 20s
+  #     - run:
+  #         name: Printscreen webpage served by container
+  #         command: |
+  #           # https://hub.docker.com/r/lifenz/docker-screenshot
+  #           # Save a screenshot as screenshot.png at 1280px after pausing 2000ms, with zoom factor: 1
+  #           docker container run --network container:fancy-nginx --name screenshot lifenz/docker-screenshot http://localhost:80 screenshot.png 1280px 2000 1
+  #           docker cp screenshot:/srv/screenshot.png $PWD
+  #     - store_artifacts:
+  #          path: screenshot.png
+  #     - run:
+  #         name: Publish image
+  #         command: |
+  #           docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:<< parameters.image_tag >>"
+  #           docker image push --all-tags "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>"
 
 workflows:
-  main:
+  i-can-buildx:
     jobs:
-      - buildx:
+      - build-push:
           matrix:
             parameters:
-              docker-version:
-                - '20.10.12'
-                - '20.10.11'
-                - '19.03.13'
-                # - '17.09.0-ce'  # note: will not work with BuildKit
-              enable-experimental-feature:
-                - false
-                - true
-            exclude:
-              # not required to use experimental features
-              - docker-version: '20.10.11'
-                enable-experimental-feature: true
-              - docker-version: '20.10.12'
-                enable-experimental-feature: true
+              exc:
+                - docker
+                - machine
+          context: docker

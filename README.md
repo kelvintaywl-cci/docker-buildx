@@ -1,10 +1,9 @@
 # docker-buildx
 I can docker buildx on CircleCI
 
-Using matrix on Docker Daemon version + setting up experimental feature.
-Explore the project's pipelines here:
-https://app.circleci.com/pipelines/github/kelvintaywl-cci/docker-buildx
+This explores how we can use `docker buildx` commands.
+In particular, I would like to showcase how to build images with Docker buildx on CircleCI.
 
+In addition, this project shows how we can take advantage of cache options with [the `docker buildx build` command](https://docs.docker.com/engine/reference/commandline/buildx_build/).
 
-Also see https://support.circleci.com/hc/en-us/articles/360058095471
-
+> By leveraging the cache options, [CircleCI's Docker Layer Caching (DLC) feature](https://circleci.com/docs/docker-layer-caching) is no longer necessary.
