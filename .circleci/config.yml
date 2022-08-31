@@ -105,7 +105,7 @@ jobs:
                   - << parameters.local-cache-prefix >>-<< parameters.exec >>-{{ arch }}-{{ .Branch }}-
                   - << parameters.local-cache-prefix >>-<< parameters.exec >>-{{ arch }}-
             - run:
-                name: Build image with buildx and local cache
+                name: Docker buildx with local cache
                 command: |
                   docker buildx build --progress=plain \
                     --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
@@ -124,7 +124,7 @@ jobs:
             equal: [ registry, << parameters.cache-type >> ]
           steps:
             - run:
-                name: Docker build with registry cache
+                name: Docker buildx with registry cache
                 command: |
                   docker buildx build --progress=plain \
                     --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
@@ -141,8 +141,8 @@ jobs:
       - run:
           name: Publish image
           command: |
-            docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>"
-            docker image push "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>"
+            docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>-<< parameters.exec >>"
+            docker image push "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>-<< parameters.exec >>"
 
 workflows:
   i-can-buildx:
