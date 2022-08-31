@@ -38,10 +38,12 @@ executors:
   docker:
     docker:
       - image: cimg/base:stable
+    resource_class: medium
   machine:
     machine:
       # See https://circleci.com/developer/images?imageType=machine
       image: ubuntu-2204:2022.07.1
+    resource_class: medium
 
 jobs:
   build-push:
