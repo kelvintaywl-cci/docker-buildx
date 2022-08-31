@@ -102,8 +102,8 @@ jobs:
           steps:
             - restore_cache:
                 keys:
-                  - << parameters.local-cache-prefix >>-{{ arch }}-{{ .Branch }}-
-                  - << parameters.local-cache-prefix >>-{{ arch }}-
+                  - << parameters.local-cache-prefix >>-<< parameters.exec >>-{{ arch }}-{{ .Branch }}-
+                  - << parameters.local-cache-prefix >>-<< parameters.exec >>-{{ arch }}-
             - run:
                 name: Build image with buildx and local cache
                 command: |
@@ -116,7 +116,7 @@ jobs:
 
                   docker image ls
             - save_cache:
-                key: << parameters.local-cache-prefix >>-{{ arch }}-{{ .Branch }}-{{ checksum "<< parameters.local-cache-path >>/index.json" }}
+                key: << parameters.local-cache-prefix >>-<< parameters.exec >>-{{ arch }}-{{ .Branch }}-{{ checksum "<< parameters.local-cache-path >>/index.json" }}
                 paths:
                   - << parameters.local-cache-path >>
       - when:
@@ -128,8 +128,8 @@ jobs:
                 command: |
                   docker buildx build --progress=plain \
                     --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
-                    --cache-to=type=registry,mode=max,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>" \
-                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>" \
+                    --cache-to=type=registry,mode=max,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>:<< parameters.exec >>" \
+                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>:<< parameters.exec >>" \
                     --output=type=docker \
                     .
 
