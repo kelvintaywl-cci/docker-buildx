@@ -41,7 +41,7 @@ executors:
   machine:
     machine:
       # See https://circleci.com/developer/images?imageType=machine
-      image: ubuntu-2204:2022.08.1 
+      image: ubuntu-2204:2022.07.1
 
 jobs:
   build-push:
