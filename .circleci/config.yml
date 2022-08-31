@@ -55,6 +55,30 @@ jobs:
         enum:
           - docker
           - machine
+      image-name:
+        description: image name for Docker image to be pushed
+        type: string
+        # See https://hub.docker.com/repository/docker/kelvintaywlcircleci/hello-buildx
+        default: "hello-buildx"
+      cache-type:
+        description: buildx cache storage type (local/registry)
+        type: enum
+        enum:
+          - registry
+          - local
+      registry-cache-image:
+        type: string
+        description: registry image for buildx cache storage (applicable only when using registry cache)
+        # See https://hub.docker.com/repository/docker/kelvintaywlcircleci/hello-buildx-registry-cache
+        default: "hello-buildx-registry-cache"
+      local-cache-path:
+        type: string
+        description: local path for buildx cache storage (applicable only when using local cache)
+        default: "/tmp/dockercache"
+      local-cache-prefix:
+        type: string
+        description: cache prefix for buildx cache storage (applicable only when using local cache)
+        default: hello-buildx
     executor: << parameters.exec >>
     steps:
       - checkout
@@ -68,134 +92,57 @@ jobs:
                 # buildx is available
                 version: 20.10.14
       - setup-buildx
+      # Login early since we likely need to pull from registry cache.
+      # ASSUMPTION: the registry cache image is located in the same registry
+      # as where we will be pushing our built image to.
+      - docker-registry-login
+      - when:
+          condition:
+            equal: [ local, << parameters.cache-type >> ]
+          steps:
+            - restore_cache:
+                keys:
+                  - << parameters.local-cache-prefix >>-{{ arch }}-{{ .Branch }}-
+                  - << parameters.local-cache-prefix >>-{{ arch }}-
+            - run:
+                name: Build image with builx and local cache
+                command: |
+                  docker buildx build --progress=plain \
+                    --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
+                    --cache-to=type=local,mode=max,dest=<< parameters.local-cache-path >> \
+                    --cache-from=type=local,src=<< parameters.local-cache-path >> \
+                    --output=type=docker \
+                    .
 
-  # build_custom_nginx:
-  #   environment:
-  #     <<: *environment
-  #   docker:
-  #     - image: cimg/base:stable
-  #   parameters:
-  #     image_name:
-  #       type: string
-  #       default: 'fancy-nginx'
-  #     image_tag:
-  #       type: string
-  #       default: 'latest'
-  #   steps:
-  #     - checkout
-  #     - setup_remote_docker:
-  #         # https://circleci.com/docs/2.0/building-docker-images/#docker-version
-  #         version: 20.10.12
-  #         # intentionally turn off CircleCI DLC
-  #         docker_layer_caching: false
-  #     - setup-buildx
-  #     - restore_cache:
-  #         keys:
-  #           - docker-{{ arch }}-{{ .Branch }}-
-  #           - docker-{{ arch }}-
-  #     - run:
-  #         name: Docker build with local cache
-  #         command: |
-  #           docker buildx build --progress=plain \
-  #             --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" \
-  #             --cache-to=type=local,mode=max,dest=/tmp/dockercache \
-  #             --cache-from=type=local,src=/tmp/dockercache \
-  #             --output=type=docker \
-  #             .
+                  docker image ls
+            - save_cache:
+                key: << parameters.local-cache-prefix >>-{{ arch }}-{{ .Branch }}-{{ checksum "<< parameters.local-cache-path >>/index.json" }}
+                paths:
+                  - << parameters.local-cache-path >>
+      - when:
+          condition:
+            equal: [ registry, << parameters.cache-type >> ]
+          steps:
+            - run:
+                name: Docker build with registry cache
+                command: |
+                  docker buildx build --progress=plain \
+                    --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
+                    --cache-to=type=registry,mode=max,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>" \
+                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.registry-cache-image >>" \
+                    --output=type=docker \
+                    .
 
-  #           docker image ls
-  #     - save_cache:
-  #         key: docker-{{ arch }}-{{ .Branch }}-{{ checksum "/tmp/dockercache/index.json" }}
-  #         paths:
-  #           - /tmp/dockercache
-  #     - run:
-  #         name: Run built-image as container (background)
-  #         command: |
-  #           docker container run -d --name fancy-nginx -p "8080:80" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}"
-  #     - run:
-  #         name: Check container is up
-  #         command: |
-  #           # Because we are using remote_docker, all docker-related activities run inside this remote container.
-  #           # In other words, the nginx server is not directly accessible to our primary container here.
-  #           # Hence, we run dockerize in the same network in order to poll it.
-  #           # NOTE that we are polling port 80, not 8080 since inside the network, our fancy-nginx is exposed at port 80 instead.
-  #           # See https://circleci.com/docs/2.0/building-docker-images/#accessing-services
-  #           docker container run --network container:fancy-nginx docker.io/jwilder/dockerize -wait http://localhost:80 -wait-retry-interval 2s -timeout 20s
-  #     - run:
-  #         name: Printscreen webpage served by container
-  #         command: |
-  #           # https://hub.docker.com/r/lifenz/docker-screenshot
-  #           # Save a screenshot as screenshot.png at 1280px after pausing 2000ms, with zoom factor: 1
-  #           docker container run --network container:fancy-nginx --name screenshot lifenz/docker-screenshot http://localhost:80 screenshot.png 1280px 2000 1
-  #           docker cp screenshot:/srv/screenshot.png $PWD
-  #     - store_artifacts:
-  #          path: screenshot.png
-  #     - docker-registry-login
-  #     - run:
-  #         name: Publish image
-  #         command: |
-  #           docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:<< parameters.image_tag >>"
-  #           docker image push --all-tags "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>"
-
-  # build_custom_nginx_via_registry:
-  #   environment:
-  #     <<: *environment
-  #   docker:
-  #     - image: cimg/base:stable
-  #   parameters:
-  #     image_name:
-  #       type: string
-  #       default: 'fancy-nginx'
-  #     image_tag:
-  #       type: string
-  #       default: 'latest'
-  #   steps:
-  #     - checkout
-  #     - setup_remote_docker:
-  #         # https://circleci.com/docs/2.0/building-docker-images/#docker-version
-  #         version: 20.10.12
-  #         # intentionally turn off CircleCI DLC
-  #         docker_layer_caching: false
-  #     - setup-buildx
-  #     - docker-registry-login
-  #     - run:
-  #         name: Docker build with registry cache
-  #         command: |
-  #           docker buildx build --progress=plain \
-  #             --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" \
-  #             --cache-to=type=registry,mode=max,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:cache" \
-  #             --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:cache" \
-  #             --output=type=docker \
-  #             .
-
-  #           docker image ls
-  #     - run:
-  #         name: Run built-image as container (background)
-  #         command: |
-  #           docker container run -d --name fancy-nginx -p "8080:80" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}"
-  #     - run:
-  #         name: Check container is up
-  #         command: |
-  #           # Because we are using remote_docker, all docker-related activities run inside this remote container.
-  #           # In other words, the nginx server is not directly accessible to our primary container here.
-  #           # Hence, we run dockerize in the same network in order to poll it.
-  #           # NOTE that we are polling port 80, not 8080 since inside the network, our fancy-nginx is exposed at port 80 instead.
-  #           # See https://circleci.com/docs/2.0/building-docker-images/#accessing-services
-  #           docker container run --network container:fancy-nginx docker.io/jwilder/dockerize -wait http://localhost:80 -wait-retry-interval 2s -timeout 20s
-  #     - run:
-  #         name: Printscreen webpage served by container
-  #         command: |
-  #           # https://hub.docker.com/r/lifenz/docker-screenshot
-  #           # Save a screenshot as screenshot.png at 1280px after pausing 2000ms, with zoom factor: 1
-  #           docker container run --network container:fancy-nginx --name screenshot lifenz/docker-screenshot http://localhost:80 screenshot.png 1280px 2000 1
-  #           docker cp screenshot:/srv/screenshot.png $PWD
-  #     - store_artifacts:
-  #          path: screenshot.png
-  #     - run:
-  #         name: Publish image
-  #         command: |
-  #           docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>:<< parameters.image_tag >>"
-  #           docker image push --all-tags "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image_name >>"
+                  docker image ls
+      - run:
+          name: Run built-image as container
+          command: |
+            docker container run --name test --env USER="<< parameters.cache-type >>" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}"
+      - run:
+          name: Publish image
+          command: |
+            docker image tag "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>"
+            docker image push "${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>"
 
 workflows:
   i-can-buildx:
@@ -206,3 +153,6 @@ workflows:
               exec:
                 - docker
                 - machine
+              cache-type:
+                - registry
+                - local
