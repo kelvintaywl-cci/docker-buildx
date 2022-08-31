@@ -50,16 +50,24 @@ jobs:
     environment:
       <<: *environment
     parameters:
-      exc:
+      exec:
         type: enum
         enum:
           - docker
           - machine
-    executor: << parameters.exc >>
+    executor: << parameters.exec >>
     steps:
       - checkout
-    
-
+      - when:
+          condition:
+            equal: [ docker, << parameters.exec >> ]
+          steps:
+            # should be >= 20.10.14 come Sep 6 2022
+            # See https://discuss.circleci.com/t/default-docker-version-for-remote-docker-jobs-changing-on-september-6/45157
+            - setup_remote_docker:
+                # buildx is available
+                version: 20.10.14
+      - setup-buildx
 
   # build_custom_nginx:
   #   environment:
@@ -195,6 +203,6 @@ workflows:
       - build-push:
           matrix:
             parameters:
-              exc:
+              exec:
                 - docker
                 - machine
