@@ -105,7 +105,7 @@ jobs:
                   - << parameters.local-cache-prefix >>-{{ arch }}-{{ .Branch }}-
                   - << parameters.local-cache-prefix >>-{{ arch }}-
             - run:
-                name: Build image with builx and local cache
+                name: Build image with buildx and local cache
                 command: |
                   docker buildx build --progress=plain \
                     --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
