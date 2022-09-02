@@ -130,7 +130,7 @@ jobs:
                   docker buildx build --progress=plain \
                     --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
                     --cache-to=type=inline \
-                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>" \
+                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:<< parameters.cache-type >>-<< parameters.exec >>" \
                     --output=type=docker \
                     .
 

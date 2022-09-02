@@ -16,7 +16,7 @@ In our `i-can-buildx` workflow, we have 4 distinct jobs, where:
 | build-push-registry-docker | Docker + Remote Docker | [Registry on Docker Hub](https://hub.docker.com/r/kelvintaywlcircleci/hello-buildx-registry-cache) | `docker.io/kelvintaywlcircleci/hello-buildx:local-machine` |
 | build-push-local-machine | Machine | local (CircleCI cache) | `docker.io/kelvintaywlcircleci/hello-buildx:registry-docker` |
 | build-push-local-docker | Docker + Remote Docker | local (CircleCI cache) | `docker.io/kelvintaywlcircleci/hello-buildx:local-docker` |
-
+| build-push-inline-machine | Machine | inline | `docker.io/kelvintaywlcircleci/hello-buildx:inline-machine` |
 
 ## Helpful References
 
