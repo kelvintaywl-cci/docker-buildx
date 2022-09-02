@@ -61,11 +61,12 @@ jobs:
         # See https://hub.docker.com/repository/docker/kelvintaywlcircleci/hello-buildx
         default: "hello-buildx"
       cache-type:
-        description: buildx cache storage type (local/registry)
+        description: buildx cache storage type (local, registry, etc)
         type: enum
         enum:
           - registry
           - local
+          - inline
       registry-cache-image:
         type: string
         description: registry image for buildx cache storage (applicable only when using registry cache)
@@ -121,6 +122,21 @@ jobs:
                   - << parameters.local-cache-path >>
       - when:
           condition:
+            equal: [ inline, << parameters.cache-type >> ]
+          steps:
+            - run:
+                name: Docker buildx with inline cache
+                command: |
+                  docker buildx build --progress=plain \
+                    --tag="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>:${CIRCLE_SHA1}" \
+                    --cache-to=type=inline \
+                    --cache-from=type=registry,ref="${DOCKER_REGISTRY}/${DOCKER_USER}/<< parameters.image-name >>" \
+                    --output=type=docker \
+                    .
+
+                  docker image ls
+      - when:
+          condition:
             equal: [ registry, << parameters.cache-type >> ]
           steps:
             - run:
@@ -159,3 +175,7 @@ workflows:
               cache-type:
                 - registry
                 - local
+                - inline
+            exclude:
+              - exec: docker
+                cache-type: inline
