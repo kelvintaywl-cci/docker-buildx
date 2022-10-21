@@ -8,7 +8,7 @@ In addition, this project shows how we can take advantage of cache options with 
 
 > By leveraging the cache options, [CircleCI's Docker Layer Caching (DLC) feature](https://circleci.com/docs/docker-layer-caching) is no longer necessary.
 
-In our `i-can-buildx` workflow, we have 4 distinct jobs, where:
+In our `i-can-buildx` workflow, we have the following distinct jobs, where:
 
 | job name | executor | buildx cache type | pushed image |
 | --- | --- | --- | --- |
